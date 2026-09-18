@@ -3,1386 +3,324 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>자원연계 대시보드</title>
-
-  <style>
-    /* 1. 디자인 시스템 변수 */
-    :root {
-      --bg-main: #f8fafc;
-      --card-bg: #ffffff;
-      --text-main: #0f172a;
-      --text-muted: #64748b;
-      --border-color: #e2e8f0;
-      --primary: #2563eb;
-
-      /* 진행 상태 태그 색상 (완료: 초록, 대기: 주황) */
-      --pending-bg: #fff7ed;
-      --pending-text: #c2410c;
-      --pending-border: #fed7aa;
-      --completed-bg: #f0fdf4;
-      --completed-text: #15803d;
-      --completed-border: #bbf7d0;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-main);
-      color: var(--text-main);
-      line-height: 1.6;
-      padding: 32px 20px;
-    }
-
-    .container { max-width: 1200px; margin: 0 auto; }
-
-    /* 상단 알림 배너 (로컬 테스트 시 안내용) */
-    .notice-banner {
-      display: none;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      margin-bottom: 20px;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    /* 상단 헤더 */
-    header {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-
-    h1 {
-      font-size: 26px;
-      font-weight: 800;
-      color: #1e293b;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .subtitle { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
-
-    /* 시트 새로고침 버튼 */
-    .refresh-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #ffffff;
-      border: 1px solid var(--border-color);
-      color: #334155;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .refresh-btn:hover {
-      background: #f1f5f9;
-      border-color: #cbd5e1;
-    }
-
-    /* 2. 상단 요약 통계 */
-    .summary-bar {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .stat-box {
-      background: var(--card-bg);
-      padding: 16px 20px;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
-    .stat-value { font-size: 26px; font-weight: 800; margin-top: 4px; }
-    .stat-box.pending .stat-value { color: var(--pending-text); }
-    .stat-box.completed .stat-value { color: var(--completed-text); }
-
-    /* 3. 툴바 (필터 + 검색) */
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      background: var(--card-bg);
-      padding: 16px 20px;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-      margin-bottom: 24px;
-    }
-
-    .filter-tabs { display: flex; gap: 8px; }
-    .tab-btn {
-      background: #f1f5f9;
-      border: 1px solid var(--border-color);
-      color: var(--text-muted);
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .tab-btn:hover { background: #e2e8f0; }
-    .tab-btn.active {
-      background: var(--primary);
-      color: #ffffff;
-      border-color: var(--primary);
-    }
-
-    .search-input {
-      padding: 8px 14px;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-size: 14px;
-      width: 260px;
-      outline: none;
-      transition: border-color 0.15s ease;
-    }
-    .search-input:focus { border-color: var(--primary); }
-
-    /* 4. 카드 그리드 */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 20px;
-    }
-
-    .card {
-      background: var(--card-bg);
-      border: 2px solid var(--border-color);
-      border-radius: 14px;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 30px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.07);
-    }
-
-    /* 카드 헤더: [지원대상 이름] + [진행 상태 태그] */
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #f1f5f9;
-    }
-
-    .user-profile {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .avatar {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: #eff6ff;
-      color: var(--primary);
-      display: grid;
-      place-items: center;
-      font-weight: 700;
-      font-size: 15px;
-    }
-
-    .person-name {
-      font-weight: 700;
-      font-size: 16px;
-      color: #1e293b;
-    }
-
-    /* 진행 상태 태그 */
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .status-badge.completed {
-      background: var(--completed-bg);
-      color: var(--completed-text);
-      border: 1px solid var(--completed-border);
-    }
-    .status-badge.pending {
-      background: var(--pending-bg);
-      color: var(--pending-text);
-      border: 1px solid var(--pending-border);
-    }
-
-    /* 카드 본문: [자원명] */
-    .resource-box {
-      background: #f8fafc;
-      border-left: 3px solid var(--primary);
-      padding: 12px 14px;
-      border-radius: 8px;
-    }
-    .resource-box .label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px; }
-    .resource-box .title { font-size: 15px; font-weight: 700; color: #0f172a; }
-
-    /* 카드 정보 행: [마감일] */
-    .card-info-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      color: #475569;
-      background: #f1f5f9;
-      padding: 8px 12px;
-      border-radius: 6px;
-    }
-    .deadline-badge {
-      font-weight: 700;
-      color: #dc2626;
-    }
-
-    /* 카톡 요약 복사 버튼 */
-    .copy-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      width: 100%;
-      padding: 9px 12px;
-      background-color: #f8fafc;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #334155;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-family: inherit;
-    }
-    .copy-btn:hover {
-      background-color: #fee500;
-      border-color: #facc15;
-      color: #191919;
-    }
-    .copy-btn.copied {
-      background-color: #dcfce7 !important;
-      border-color: #86efac !important;
-      color: #15803d !important;
-    }
-
-    /* 로딩 스피너 및 안내문 */
-    .loading-state, .empty-msg {
-      grid-column: 1 / -1;
-      text-align: center;
-      padding: 60px 0;
-      background: var(--card-bg);
-      border-radius: 12px;
-      color: var(--text-muted);
-      font-size: 15px;
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 32px;
-      height: 32px;
-      border: 3px solid rgba(37, 99, 235, 0.2);
-      border-radius: 50%;
-      border-top-color: var(--primary);
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 12px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* ============================================================
-       [암호 인증 화면 스타일] 진한 네이비 배경 + 흰색 박스
-       ============================================================ */
-    .auth-screen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: #0b192c; /* 진한 네이비 배경 */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      padding: 20px;
-    }
-
-    /* 흰색 모달 박스 */
-    .auth-card {
-      background: #ffffff;
-      width: 100%;
-      max-width: 380px;
-      border-radius: 18px;
-      padding: 40px 30px;
-      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
-      text-align: center;
-      transition: transform 0.2s ease;
-    }
-
-    .auth-icon {
-      font-size: 38px;
-      margin-bottom: 12px;
-    }
-
-    .auth-title {
-      font-size: 22px;
-      font-weight: 800;
-      color: #0f172a;
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
-    }
-
-    .auth-subtitle {
-      font-size: 13px;
-      color: #64748b;
-      margin-bottom: 24px;
-    }
-
-    .auth-input-group {
-      margin-bottom: 16px;
-    }
-
-    .auth-input {
-      width: 100%;
-      padding: 13px 16px;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 10px;
-      font-size: 15px;
-      outline: none;
-      transition: all 0.2s ease;
-      text-align: center;
-      letter-spacing: 3px;
-    }
-
-    .auth-input:focus {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-    }
-
-    .auth-submit-btn {
-      width: 100%;
-      padding: 13px;
-      background-color: #1e3a8a; /* 진한 네이비 블루 버튼 */
-      color: #ffffff;
-      border: none;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-    }
-
-    .auth-submit-btn:hover {
-      background-color: #1e40af;
-    }
-
-    /* 암호 불일치 메시지 */
-    .auth-error-msg {
-      display: none;
-      color: #dc2626;
-      font-size: 13px;
-      font-weight: 700;
-      margin-top: 16px;
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      padding: 9px 14px;
-      border-radius: 8px;
-    }
-
-    /* 틀렸을 때 카드 흔들림 애니메이션 */
-    .shake {
-      animation: shake 0.4s ease-in-out;
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-8px); }
-      40%, 80% { transform: translateX(8px); }
-    }
-
-    /* ============================================================
-       [새 자원 추가 모달 스타일]
-       ============================================================ */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      padding: 20px;
-    }
-
-    .modal-card {
-      background: #ffffff;
-      width: 100%;
-      max-width: 650px;
-      max-height: 90vh;
-      border-radius: 18px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      animation: modalFadeIn 0.25s ease-out;
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.96) translateY(10px); }
-      to { opacity: 1; transform: scale(1) translateY(0); }
-    }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 20px 24px;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    .modal-title {
-      font-size: 19px;
-      font-weight: 800;
-      color: #0f172a;
-    }
-
-    .modal-close-btn {
-      background: none;
-      border: none;
-      font-size: 20px;
-      color: #64748b;
-      cursor: pointer;
-      line-height: 1;
-      padding: 4px;
-    }
-    .modal-close-btn:hover { color: #0f172a; }
-
-    .modal-body {
-      padding: 24px;
-      overflow-y: auto;
-    }
-
-    /* 1. AI 공고문 붙여넣기 박스 */
-    .ai-box {
-      background: #f0f7ff;
-      border: 1.5px solid #bfdbfe;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-
-    .ai-box-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .ai-badge {
-      background: #2563eb;
-      color: #ffffff;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 20px;
-    }
-
-    .ai-box-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #1e40af;
-    }
-
-    .ai-textarea {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      font-size: 13px;
-      line-height: 1.5;
-      font-family: inherit;
-      resize: vertical;
-      outline: none;
-      background: #ffffff;
-      margin-bottom: 10px;
-      box-sizing: border-box;
-    }
-    .ai-textarea:focus { border-color: #2563eb; }
-
-    .ai-btn-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .ai-action-btn {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      color: #ffffff;
-      border: none;
-      padding: 9px 18px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-    }
-    .ai-action-btn:hover {
-      background: linear-gradient(135deg, #1d4ed8, #1e40af);
-      transform: translateY(-1px);
-    }
-
-    .ai-status-text {
-      font-size: 12px;
-      font-weight: 600;
-      color: #15803d;
-    }
-
-    /* 2. 폼 그리드 */
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    .form-group.full-width {
-      grid-column: 1 / -1;
-    }
-
-    .form-group label {
-      font-size: 13px;
-      font-weight: 700;
-      color: #334155;
-    }
-
-    .form-group label .required {
-      color: #dc2626;
-    }
-
-    .form-control {
-      padding: 10px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 13px;
-      outline: none;
-      font-family: inherit;
-      transition: border-color 0.15s;
-      box-sizing: border-box;
-      width: 100%;
-    }
-    .form-control:focus {
-      border-color: #2563eb;
-    }
-
-    .modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 20px;
-      padding-top: 16px;
-      border-top: 1px solid #f1f5f9;
-    }
-
-    .cancel-btn {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #e2e8f0;
-      padding: 10px 18px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .cancel-btn:hover { background: #e2e8f0; }
-
-    .save-btn {
-      background: #10b981;
-      color: #ffffff;
-      border: none;
-      padding: 10px 22px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-    .save-btn:hover { background: #059669; }
-
-    /* 헤더 새 자원 추가 버튼 */
-    .primary-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #2563eb;
-      color: #ffffff;
-      padding: 8px 16px;
-      border-radius: 8px;
-      border: none;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .primary-btn:hover { background: #1d4ed8; }
-  </style>
+  <title>개인 자산 현황 대시보드</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS (xlsx) CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <link rel="stylesheet" href="css/custom.css">
 </head>
-<body>
+<body class="min-h-screen pb-16">
 
-  <!-- ============================================================
-       [암호 입력 화면] 진한 네이비 배경 + 흰색 박스
-       ============================================================ -->
-  <div id="authScreen" class="auth-screen">
-    <div class="auth-card" id="authCard">
-      <div class="auth-icon">🔒</div>
-      <h2 class="auth-title">소사자활센터 대시보드</h2>
-      <p class="auth-subtitle">보안을 위해 관리자 암호를 입력해 주세요.</p>
-
-      <form id="authForm" onsubmit="handleAuthSubmit(event)">
-        <div class="auth-input-group">
-          <input 
-            type="password" 
-            id="passwordInput" 
-            class="auth-input" 
-            placeholder="암호 입력" 
-            autocomplete="current-password"
-          />
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+          ₩
         </div>
-        <button type="submit" class="auth-submit-btn">대시보드 접속</button>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 leading-tight">자산 관리 대시보드</h1>
+          <p class="text-xs text-slate-500">연금저축 · ISA · 해외주식 · 국내외주식 · CMA</p>
+        </div>
+      </div>
+
+      <!-- Header actions -->
+      <div class="flex items-center gap-2.5">
+        <button id="resetDataBtn" class="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 transition border border-rose-200 rounded-lg shadow-sm">
+          전체 데이터 초기화 (비우기)
+        </button>
+        <button id="downloadCurrentDataBtn" class="text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 transition rounded-lg flex items-center gap-1 shadow-sm">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          현재 데이터 엑셀 백업 다운로드
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+
+    <!-- Top Key Metrics Cards -->
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="fin-card p-5">
+        <span class="text-xs font-medium text-slate-500">현재 총 순자산</span>
+        <div id="metricTotalAsset" class="text-2xl font-extrabold text-slate-900 mt-1 font-mono-num">0원</div>
+        <div class="text-xs text-slate-400 mt-1">주식 평가액 + CMA/예수금</div>
+      </div>
+
+      <div class="fin-card p-5">
+        <span class="text-xs font-medium text-slate-500">총 누적 적립(저축) 원금</span>
+        <div id="metricTotalSavings" class="text-2xl font-bold text-slate-800 mt-1 font-mono-num">0원</div>
+        <div class="text-xs text-slate-400 mt-1">월별 납입 누적 합계</div>
+      </div>
+
+      <div class="fin-card p-5">
+        <span class="text-xs font-medium text-slate-500">총 누적 평가손익 (수익률)</span>
+        <div id="metricTotalProfit" class="text-2xl font-bold mt-1 font-mono-num">0원</div>
+        <div class="text-xs text-slate-400 mt-1">총 자산 대비 원금 수익률</div>
+      </div>
+
+      <div class="fin-card p-5">
+        <span id="metricLatestMonthLabel" class="text-xs font-medium text-slate-500">최근 월 저축액</span>
+        <div id="metricLatestMonth" class="text-2xl font-bold text-slate-800 mt-1 font-mono-num">0원</div>
+        <div class="text-xs text-slate-400 mt-1">5개 계좌 당월 합산액</div>
+      </div>
+    </section>
+
+    <!-- 5 Account Valuation Cards -->
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <span>계좌별 현재 잔고 (주식 평가액 + 예수금)</span>
+            <span class="text-xs font-normal text-slate-400">각 카드의 잔고 금액을 직접 수정할 수 있습니다</span>
+          </h2>
+        </div>
+        <button id="openBatchBalancesModalBtn" class="text-xs font-medium text-slate-700 hover:text-slate-950 bg-white hover:bg-slate-50 border border-slate-300 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> 계좌 잔고 일괄 수정
+        </button>
+      </div>
+      <div id="accountCardsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <!-- JS rendered cards -->
+      </div>
+    </section>
+
+    <!-- Charts Section -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <!-- Monthly Savings Stacked Bar Chart -->
+      <div class="fin-card p-5 lg:col-span-2 flex flex-col justify-between">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">월별 저축액 추이</h3>
+            <p class="text-xs text-slate-400">각 계좌별 월 저축/납입액 분포</p>
+          </div>
+        </div>
+        <div class="relative h-64 w-full">
+          <canvas id="monthlySavingsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Asset Allocation Doughnut Chart -->
+      <div class="fin-card p-5 flex flex-col justify-between">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">자산 배분 비중</h3>
+            <p class="text-xs text-slate-400">현재 계좌 잔고 기준 포트폴리오</p>
+          </div>
+        </div>
+        <div class="relative h-64 w-full flex items-center justify-center">
+          <canvas id="assetAllocationChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Cumulative Growth Line Chart -->
+      <div class="fin-card p-5 lg:col-span-3">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">총 적립액(원금) 누적 추이</h3>
+            <p class="text-xs text-slate-400">저축 누적 원금의 우상향 곡선</p>
+          </div>
+        </div>
+        <div class="relative h-56 w-full">
+          <canvas id="cumulativeWealthChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Savings Actions Toolbar & Table Section -->
+    <section class="pt-2">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3 mb-4">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">월별 저축 내역 관리</h3>
+          <p class="text-xs text-slate-500">매월 5개 계좌에 저축/납입한 원금을 기록합니다.</p>
+        </div>
+
+        <!-- Savings Actions -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="downloadSavingsTemplateBtn" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 transition shadow-sm">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> 엑셀 양식 다운로드
+          </button>
+          <button id="uploadSavingsBtn" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 transition shadow-sm">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i> 엑셀 업로드
+          </button>
+          <input type="file" id="savingsFileInput" accept=".xlsx, .xls, .csv" class="hidden">
+          
+          <button id="openAddSavingsBtn" class="px-3.5 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg flex items-center gap-1.5 transition shadow-sm">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> 월 저축액 직접 입력
+          </button>
+        </div>
+      </div>
+
+      <!-- 월별 저축 내역 테이블 카드 -->
+      <div id="savingsView" class="fin-card overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">월별 납입 상세 목록</h4>
+          <span class="text-xs text-slate-400">최신순 정렬</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 bg-slate-50">
+                <th class="py-3 px-4">연월</th>
+                <th class="py-3 px-4 text-right">연금저축</th>
+                <th class="py-3 px-4 text-right">ISA</th>
+                <th class="py-3 px-4 text-right">해외주식</th>
+                <th class="py-3 px-4 text-right">국내외주식</th>
+                <th class="py-3 px-4 text-right">CMA</th>
+                <th class="py-3 px-4 text-right">월 총 저축액</th>
+                <th class="py-3 px-4 text-center">관리</th>
+              </tr>
+            </thead>
+            <tbody id="savingsTableBody">
+              <!-- JS populated -->
+            </tbody>
+          </table>
+        </div>
+        <!-- 더보기 / 접기 버튼 영역 -->
+        <div id="savingsLoadMoreContainer" class="p-3 border-t border-slate-100 text-center bg-slate-50/30 hidden">
+          <button id="toggleSavingsExpandBtn" onclick="toggleSavingsExpand()" class="text-xs font-semibold text-slate-700 hover:text-slate-950 px-4 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition inline-flex items-center gap-1 shadow-sm">
+            <span id="toggleSavingsExpandText">이전 내역 더보기 (전체 펼치기)</span>
+            <i id="toggleSavingsExpandIcon" data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal 1: 저축액 직접 입력 모달 -->
+  <div id="addSavingsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 m-4 border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 id="savingsModalTitle" class="text-base font-bold text-slate-900">월별 저축액 입력</h3>
+        <button id="closeSavingsModalBtn" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="savingsForm" class="mt-4 space-y-3">
+        <input type="hidden" id="savingsEditId" value="">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">연월 (YYYY-MM)</label>
+          <input type="month" id="inputMonth" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:border-slate-800 outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">연금저축 (원)</label>
+            <input type="number" id="inputPension" value="0" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">ISA (원)</label>
+            <input type="number" id="inputIsa" value="0" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">해외주식 (원)</label>
+            <input type="number" id="inputUsStock" value="0" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">국내외주식 (원)</label>
+            <input type="number" id="inputGlobalStock" value="0" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">CMA (원)</label>
+          <input type="number" id="inputCma" value="0" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800">
+        </div>
+        <div class="pt-3 flex justify-end gap-2">
+          <button type="button" onclick="document.getElementById('addSavingsModal').classList.add('hidden')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">취소</button>
+          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg">저장하기</button>
+        </div>
       </form>
-
-      <!-- 암호가 틀렸을 때 나타나는 경고 메시지 -->
-      <div id="authErrorMessage" class="auth-error-msg">
-        암호가 일치하지 않습니다
-      </div>
     </div>
   </div>
 
-  <!-- 대시보드 본 화면 (암호 인증 전에는 숨겨짐) -->
-  <div class="container" id="dashboardContainer" style="display: none;">
-    <!-- 로컬 브라우저 실행 시 안내 배너 -->
-    <div id="noticeBanner" class="notice-banner">
-      <span>💡 <strong>로컬 미리보기 모드</strong>: 구글 시트 배포 시 실제 시트 데이터가 실시간으로 연동됩니다.</span>
-    </div>
-
-    <!-- 1. 헤더 -->
-    <header>
-      <div>
-        <h1>📊 소사자활센터 자원연계 대시보드</h1>
-        <p class="subtitle" id="sheetSubtitle">스프레드시트 데이터를 불러오는 중...</p>
-      </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <button type="button" class="primary-btn" onclick="openAddModal()">
-          ➕ 새 자원 추가
-        </button>
-        <button type="button" class="refresh-btn" onclick="fetchSheetData()">
-          🔄 시트 새로고침
-        </button>
-      </div>
-    </header>
-
-    <!-- ============================================================
-         [새 자원 추가 모달] 공고문 통째로 붙여넣기 + AI 자동 완성
-         ============================================================ -->
-    <div id="addModalOverlay" class="modal-overlay" style="display: none;">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title">➕ 새 지원사업 / 자원 등록</h3>
-          <button type="button" class="modal-close-btn" onclick="closeAddModal()">✕</button>
+  <!-- Modal 2: 계좌별 현재 잔고 일괄 수정 모달 -->
+  <div id="batchBalancesModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 m-4 border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">계좌별 현재 잔고 일괄 수정</h3>
+          <p class="text-xs text-slate-500 mt-0.5">각 증권/은행 앱의 현재 총 평가액(예수금 포함)을 입력하세요.</p>
         </div>
-
-        <div class="modal-body">
-          <!-- 1. AI 공고문 붙여넣기 섹션 (상단 강조 박스) -->
-          <div class="ai-box">
-            <div class="ai-box-header">
-              <span class="ai-badge">🤖 AI 스마트 분석</span>
-              <span class="ai-box-title">공고문을 통째로 붙여넣으면 AI가 아래 항목을 자동 완성해 드립니다.</span>
-            </div>
-            <textarea 
-              id="announcementInput" 
-              class="ai-textarea" 
-              rows="4" 
-              placeholder="복지사업 안내문이나 공고문 텍스트를 여기에 통째로 복사해서 붙여넣으세요...&#10;&#10;예시:&#10;[2026년 취약계층 에너지바우처 지원사업]&#10;1. 사업명: 동절기 난방비 긴급지원&#10;2. 지원대상: 소사구 관내 기초수급자 및 차상위 계층&#10;3. 지원내용: 동절기 난방 연료비 20만원 지원&#10;4. 신청기한: 2026년 10월 31일까지&#10;5. 접수기관: 부천소사지역자활센터"
-            ></textarea>
-            <div class="ai-btn-row">
-              <button type="button" id="btnAiExtract" class="ai-action-btn" onclick="handleAiExtract()">
-                ✨ AI 자동 완성 실행
-              </button>
-              <span id="aiStatusText" class="ai-status-text"></span>
-            </div>
+        <button id="closeBatchBalancesModalBtn" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="batchBalancesForm" class="mt-4 space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-blue-700 mb-1 flex justify-between">
+            <span>연금저축 현재 잔고</span>
+            <span id="labelPrincipalPension" class="text-slate-400 font-normal">원금: 0원</span>
+          </label>
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="batchPension" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800 font-semibold">
+            <span class="text-xs text-slate-500 font-medium">원</span>
           </div>
-
-          <!-- 2. 자동 완성 및 직접 수정 입력 폼 -->
-          <form id="addResourceForm" onsubmit="handleSaveResource(event)">
-            <div class="form-grid">
-              <!-- 1. 자원명 -->
-              <div class="form-group full-width">
-                <label for="inputResource">자원명 (사업명) <span class="required">*</span></label>
-                <input type="text" id="inputResource" class="form-control" placeholder="예: 동절기 난방비 긴급지원" required />
-              </div>
-
-              <!-- 2. 지원대상 -->
-              <div class="form-group">
-                <label for="inputTarget">지원대상 <span class="required">*</span></label>
-                <input type="text" id="inputTarget" class="form-control" placeholder="예: 소사구 거주 독거노인 또는 홍길동" required />
-              </div>
-
-              <!-- 3. 마감일 -->
-              <div class="form-group">
-                <label for="inputDeadline">마감일 (신청기한)</label>
-                <input type="text" id="inputDeadline" class="form-control" placeholder="예: 2026-10-31" />
-              </div>
-
-              <!-- 4. 모집기관 -->
-              <div class="form-group">
-                <label for="inputOrg">모집기관 (주관처)</label>
-                <input type="text" id="inputOrg" class="form-control" placeholder="예: 부천소사지역자활센터" />
-              </div>
-
-              <!-- 5. 진행상태 -->
-              <div class="form-group">
-                <label for="inputStatus">현재 진행상태</label>
-                <select id="inputStatus" class="form-control">
-                  <option value="대기" selected>⏳ 대기</option>
-                  <option value="완료">✅ 완료</option>
-                </select>
-              </div>
-
-              <!-- 6. 지원내용 -->
-              <div class="form-group full-width">
-                <label for="inputContent">지원내용 (상세 혜택)</label>
-                <textarea id="inputContent" class="form-control" rows="2" placeholder="예: 동절기 난방 연료비 가구당 20만원 지급"></textarea>
-              </div>
-            </div>
-
-            <!-- 하단 버튼 -->
-            <div class="modal-footer">
-              <button type="button" class="cancel-btn" onclick="closeAddModal()">취소</button>
-              <button type="submit" id="btnSaveResource" class="save-btn">💾 시트에 등록하기</button>
-            </div>
-          </form>
         </div>
-      </div>
+        <div>
+          <label class="block text-xs font-semibold text-emerald-700 mb-1 flex justify-between">
+            <span>ISA 현재 잔고</span>
+            <span id="labelPrincipalIsa" class="text-slate-400 font-normal">원금: 0원</span>
+          </label>
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="batchIsa" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800 font-semibold">
+            <span class="text-xs text-slate-500 font-medium">원</span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-purple-700 mb-1 flex justify-between">
+            <span>해외주식 현재 잔고 (원화 환산액)</span>
+            <span id="labelPrincipalUsStock" class="text-slate-400 font-normal">원금: 0원</span>
+          </label>
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="batchUsStock" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800 font-semibold">
+            <span class="text-xs text-slate-500 font-medium">원</span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-amber-700 mb-1 flex justify-between">
+            <span>국내외주식 현재 잔고</span>
+            <span id="labelPrincipalGlobalStock" class="text-slate-400 font-normal">원금: 0원</span>
+          </label>
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="batchGlobalStock" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800 font-semibold">
+            <span class="text-xs text-slate-500 font-medium">원</span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1 flex justify-between">
+            <span>CMA 통장 잔고 (이자 포함)</span>
+            <span id="labelPrincipalCma" class="text-slate-400 font-normal">원금: 0원</span>
+          </label>
+          <div class="flex items-center gap-1.5">
+            <input type="number" id="batchCma" step="1" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-right font-mono-num outline-none focus:border-slate-800 font-semibold">
+            <span class="text-xs text-slate-500 font-medium">원</span>
+          </div>
+        </div>
+        <div class="pt-3 flex justify-end gap-2">
+          <button type="button" onclick="document.getElementById('batchBalancesModal').classList.add('hidden')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">취소</button>
+          <button type="submit" class="px-4 py-2 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg">적용 및 저장</button>
+        </div>
+      </form>
     </div>
-
-    <!-- 2. 요약 통계 -->
-    <section class="summary-bar">
-      <div class="stat-box">
-        <span class="stat-label">전체 연계 건수</span>
-        <span class="stat-value" id="countTotal">0건</span>
-      </div>
-      <div class="stat-box pending">
-        <span class="stat-label">⏳ 대기 건수</span>
-        <span class="stat-value" id="countPending">0건</span>
-      </div>
-      <div class="stat-box completed">
-        <span class="stat-label">✅ 완료 건수</span>
-        <span class="stat-value" id="countCompleted">0건</span>
-      </div>
-    </section>
-
-    <!-- 3. 필터 및 검색 바 -->
-    <section class="toolbar">
-      <div class="filter-tabs">
-        <button class="tab-btn active" data-filter="전체">전체 보기</button>
-        <button class="tab-btn" data-filter="대기">대기 목록</button>
-        <button class="tab-btn" data-filter="완료">완료 목록</button>
-      </div>
-      <input type="text" id="searchInput" class="search-input" placeholder="지원대상 또는 자원명 검색..." />
-    </section>
-
-    <!-- 4. 카드 목록 컨테이너 -->
-    <main class="card-grid" id="cardGrid">
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <p>구글 스프레드시트에서 데이터를 읽어오고 있습니다...</p>
-      </div>
-    </main>
   </div>
 
-  <!-- 
-    ======================================================================
-    [HTML5 <template> 태그]
-    자원명, 지원대상(마스킹), 마감일, 진행상태, 카톡 복사 버튼으로 구성
-    ======================================================================
-  -->
-  <template id="cardTemplate">
-    <article class="card">
-      <div>
-        <!-- 카드 헤더: [지원대상] & [진행 상태 태그] -->
-        <div class="card-header">
-          <div class="user-profile">
-            <div class="avatar"></div>
-            <span class="person-name"></span>
-          </div>
-          <span class="status-badge"></span>
-        </div>
-
-        <!-- 카드 본문: [자원명] & [지원내용] -->
-        <div class="resource-box" style="margin-top: 14px;">
-          <div class="label">신청 자원명</div>
-          <div class="title resource-title"></div>
-          <div class="resource-content" style="font-size: 13px; color: #475569; margin-top: 6px; display: none; line-height: 1.4;"></div>
-        </div>
-      </div>
-
-      <div>
-        <!-- 카드 정보: [모집기관 & 마감일] -->
-        <div class="card-info-row">
-          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%;">🏢 <span class="org-text">소사자활센터</span></span>
-          <span>⏰ <strong class="deadline-text"></strong></span>
-        </div>
-
-        <!-- 카톡 요약 복사 버튼 -->
-        <button type="button" class="copy-btn" style="margin-top: 12px;">
-          📋 카톡 요약 복사
-        </button>
-      </div>
-    </article>
-  </template>
-
-  <!-- 
-    ======================================================================
-    [JavaScript 영역]
-    Google Apps Script(code.gs) 연동 및 동적 렌더링
-    ======================================================================
-  -->
+  <!-- Scripts -->
+  <script src="js/storage.js"></script>
+  <script src="js/excel-manager.js"></script>
+  <script src="js/chart-manager.js"></script>
+  <script src="js/app.js"></script>
   <script>
-    // 0. [서버 사이드 보안 암호 검증]
-    // ★ 보안 강화: 브라우저 '소스보기'에는 비밀번호가 전혀 적혀있지 않습니다.
-    // 입력한 암호는 구글 서버(code.gs)로 안전하게 전송되어 검증되며,
-    // 암호가 일치할 때만 구글 시트 데이터가 화면에 내려옵니다.
-    function handleAuthSubmit(e) {
-      if (e) e.preventDefault();
-
-      const pwdInput = document.getElementById("passwordInput");
-      const errorMsg = document.getElementById("authErrorMessage");
-      const authCard = document.getElementById("authCard");
-      const authScreen = document.getElementById("authScreen");
-      const dashboard = document.getElementById("dashboardContainer");
-      const submitBtn = document.querySelector(".auth-submit-btn");
-
-      const inputVal = pwdInput.value.trim();
-      if (!inputVal) {
-        showAuthError("암호를 입력해 주세요.");
-        return;
-      }
-
-      // 버튼 로딩 상태
-      submitBtn.disabled = true;
-      submitBtn.textContent = "암호 확인 중...";
-
-      // (1) 구글 앱스 스크립트 서버 환경: 구글 서버에서 암호 검증
-      if (typeof google !== "undefined" && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(response => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = "대시보드 접속";
-
-            if (response.success) {
-              // 암호 일치: 구글 서버가 시트 데이터와 함께 승인 반환
-              errorMsg.style.display = "none";
-              authScreen.style.display = "none";
-              dashboard.style.display = "block";
-              sessionStorage.setItem("sosa_authenticated", "true");
-              onDataLoaded(response);
-            } else {
-              showAuthError(response.error || "암호가 일치하지 않습니다");
-            }
-          })
-          .withFailureHandler(err => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = "대시보드 접속";
-            showAuthError("서버 오류: " + err);
-          })
-          .verifyPasswordAndGetData(inputVal);
-      } else {
-        // (2) 로컬 단독 테스트 환경 (오프라인 시뮬레이션)
-        setTimeout(() => {
-          submitBtn.disabled = false;
-          submitBtn.textContent = "대시보드 접속";
-
-          // 로컬 테스트 시에는 '1234'로 시뮬레이션
-          if (inputVal === "1234") {
-            errorMsg.style.display = "none";
-            authScreen.style.display = "none";
-            dashboard.style.display = "block";
-            sessionStorage.setItem("sosa_authenticated", "true");
-            fetchSheetData();
-          } else {
-            showAuthError("암호가 일치하지 않습니다");
-          }
-        }, 400);
-      }
-    }
-
-    // 에러 표시 및 흔들림 효과 유틸리티
-    function showAuthError(msg) {
-      const errorMsg = document.getElementById("authErrorMessage");
-      const authCard = document.getElementById("authCard");
-      const pwdInput = document.getElementById("passwordInput");
-
-      errorMsg.textContent = msg || "암호가 일치하지 않습니다";
-      errorMsg.style.display = "block";
-      authCard.classList.remove("shake");
-      void authCard.offsetWidth; // 리플로우 강제 트리거
-      authCard.classList.add("shake");
-      pwdInput.value = "";
-      pwdInput.focus();
-    }
-
-    // [인증 상태 확인 함수]
-    function checkAuthStatus() {
-      const isAuth = sessionStorage.getItem("sosa_authenticated");
-      const authScreen = document.getElementById("authScreen");
-      const dashboard = document.getElementById("dashboardContainer");
-
-      if (isAuth === "true") {
-        // 이미 암호를 통과한 세션인 경우 바로 대시보드 열기
-        authScreen.style.display = "none";
-        dashboard.style.display = "block";
-        fetchSheetData();
-      } else {
-        // 암호 입력 화면 유지 및 인풋창 자동 포커스
-        authScreen.style.display = "flex";
-        dashboard.style.display = "none";
-        setTimeout(() => {
-          const input = document.getElementById("passwordInput");
-          if (input) input.focus();
-        }, 150);
-      }
-    }
-
-    // 전역 상태 변수
-    let dataList = [];
-    let activeFilter = "전체";
-    let searchQuery = "";
-
-    // DOM 캐싱
-    const grid = document.getElementById("cardGrid");
-    const template = document.getElementById("cardTemplate");
-    const countTotal = document.getElementById("countTotal");
-    const countPending = document.getElementById("countPending");
-    const countCompleted = document.getElementById("countCompleted");
-    const sheetSubtitle = document.getElementById("sheetSubtitle");
-
-    // ===================================================================
-    // [이름 마스킹 함수]
-    // 지원대상의 이름 가운데 글자를 'O'으로 변환
-    // - 2글자: '김철' -> '김O'
-    // - 3글자: '이혜빈' -> '이O빈'
-    // - 4글자: '남궁민수' -> '남OO수'
-    // ===================================================================
-    const maskName = name => {
-      if (!name || name.length < 2) return name;
-      return name.length === 2
-        ? `${name[0]}O`
-        : `${name[0]}${"O".repeat(name.length - 2)}${name.slice(-1)}`;
-    };
-
-    // 1. [구글 시트 데이터 가져오기]
-    function fetchSheetData() {
-      grid.innerHTML = `
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <p>구글 시트 데이터를 갱신 중입니다...</p>
-        </div>
-      `;
-
-      // 구글 앱스 스크립트 환경인지 확인
-      if (typeof google !== "undefined" && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(onDataLoaded)
-          .withFailureHandler(onError)
-          .getSheetData();
-      } else {
-        // 로컬 브라우저에서 단독 실행 시 샘플 데이터로 동작
-        document.getElementById("noticeBanner").style.display = "flex";
-        setTimeout(() => {
-          onDataLoaded({
-            success: true,
-            sheetName: "자원연계현황(샘플)",
-            totalRows: 6,
-            data: [
-              { id: 1, resource: "보일러 교체 및 난방 지원", target: "홍길동", deadline: "2026-09-30", status: "대기" },
-              { id: 2, resource: "청년 구직활동 지원금", target: "이혜빈", deadline: "2026-10-15", status: "대기" },
-              { id: 3, resource: "보조공학기기(휠체어) 지원", target: "박영희", deadline: "2026-09-20", status: "완료" },
-              { id: 4, resource: "독거노인 반찬 정기 배달", target: "김철", deadline: "2026-10-05", status: "대기" },
-              { id: 5, resource: "다문화 가정 한국어 교실", target: "남궁민수", deadline: "2026-09-25", status: "완료" },
-              { id: 6, resource: "청소년 학습용 태블릿 지원", target: "황보하늘", deadline: "2026-10-31", status: "대기" }
-            ]
-          });
-        }, 500);
-      }
-    }
-
-    // 2. [데이터 수신 성공 처리]
-    function onDataLoaded(response) {
-      if (!response.success) {
-        onError(response.error);
-        return;
-      }
-
-      dataList = response.data || [];
-      sheetSubtitle.textContent = `시트: ${response.sheetName || "연결됨"} (총 ${dataList.length}건 연동)`;
-      render();
-    }
-
-    // 데이터 수신 실패 처리
-    function onError(err) {
-      grid.innerHTML = `
-        <div class="empty-msg" style="color: #dc2626;">
-          ⚠️ 시트 데이터를 불러오지 못했습니다.<br>
-          <small style="color: #64748b;">오류 내용: ${err || "알 수 없는 오류"}</small>
-        </div>
-      `;
-    }
-
-    // 3. [<template> 복제 및 개별 카드 생성]
-    function createCardNode(item) {
-      const clone = template.content.cloneNode(true);
-      const isDone = item.status === "완료";
-
-      // 지원대상: 첫 글자 아바타 + 마스킹된 이름
-      const masked = maskName(item.target);
-      clone.querySelector(".avatar").textContent = item.target ? item.target[0] : "?";
-      clone.querySelector(".person-name").textContent = masked;
-
-      // 진행 상태 태그: 완료(초록색), 대기(주황색)
-      const badge = clone.querySelector(".status-badge");
-      badge.textContent = `${isDone ? "●" : "⏳"} ${item.status}`;
-      badge.classList.add(isDone ? "completed" : "pending");
-
-      // 자원명
-      clone.querySelector(".resource-title").textContent = item.resource;
-
-      // 지원내용 (있으면 노출)
-      const contentEl = clone.querySelector(".resource-content");
-      if (item.content) {
-        contentEl.textContent = `📋 ${item.content}`;
-        contentEl.style.display = "block";
-      }
-
-      // 모집기관
-      const orgEl = clone.querySelector(".org-text");
-      if (item.org) {
-        orgEl.textContent = item.org;
-      }
-
-      // 마감일
-      clone.querySelector(".deadline-text").textContent = item.deadline;
-
-      // [카톡 요약 복사 기능]
-      // 형식: '이름: 홍O동 / 자원: 보일러 교체 지원 / 마감일: 2026-09-30 / 상태: 대기'
-      const copyBtn = clone.querySelector(".copy-btn");
-      copyBtn.addEventListener("click", () => {
-        let summaryText = `이름: ${masked} / 자원: ${item.resource} / 마감일: ${item.deadline} / 상태: ${item.status}`;
-        if (item.org) summaryText += ` / 기관: ${item.org}`;
-
-        copyToClipboard(summaryText, () => {
-          copyBtn.classList.add("copied");
-          copyBtn.textContent = "✓ 복사됨!";
-          setTimeout(() => {
-            copyBtn.classList.remove("copied");
-            copyBtn.textContent = "📋 카톡 요약 복사";
-          }, 1500);
-        });
-      });
-
-      return clone;
-    }
-
-    // ===================================================================
-    // [새 자원 추가 모달 & AI 자동 완성 제어 함수]
-    // ===================================================================
-    function openAddModal() {
-      document.getElementById("addModalOverlay").style.display = "flex";
-      document.getElementById("announcementInput").focus();
-    }
-
-    function closeAddModal() {
-      document.getElementById("addModalOverlay").style.display = "none";
-      document.getElementById("addResourceForm").reset();
-      document.getElementById("announcementInput").value = "";
-      document.getElementById("aiStatusText").textContent = "";
-    }
-
-    // AI 공고문 자동 완성 버튼 핸들러
-    function handleAiExtract() {
-      const text = document.getElementById("announcementInput").value.trim();
-      const statusText = document.getElementById("aiStatusText");
-      const btn = document.getElementById("btnAiExtract");
-
-      if (!text) {
-        alert("공고문 내용을 먼저 붙여넣어 주세요!");
-        document.getElementById("announcementInput").focus();
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = "⏳ AI 분석 중...";
-      statusText.textContent = "공고문 핵심 정보 추출 중...";
-      statusText.style.color = "#2563eb";
-
-      // 추출된 데이터로 폼 필드 채우기
-      const fillForm = data => {
-        if (data.resource) document.getElementById("inputResource").value = data.resource;
-        if (data.target) document.getElementById("inputTarget").value = data.target;
-        if (data.content) document.getElementById("inputContent").value = data.content;
-        if (data.deadline) document.getElementById("inputDeadline").value = data.deadline;
-        if (data.org) document.getElementById("inputOrg").value = data.org;
-
-        btn.disabled = false;
-        btn.textContent = "✨ AI 자동 완성 실행";
-        statusText.textContent = "✅ 자원명·지원대상·지원내용·마감일·모집기관이 채워졌습니다!";
-        statusText.style.color = "#15803d";
-      };
-
-      // (1) 구글 앱스 스크립트 환경: 서버 AI 분석 호출
-      if (typeof google !== "undefined" && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(res => {
-            if (res.success && res.data) {
-              fillForm(res.data);
-            } else {
-              fillForm(parseAnnouncementRegexClient(text));
-            }
-          })
-          .withFailureHandler(() => {
-            fillForm(parseAnnouncementRegexClient(text));
-          })
-          .extractAnnouncementWithAI(text);
-      } else {
-        // (2) 로컬 브라우저 환경: 내장 스마트 파서 실행
-        setTimeout(() => {
-          fillForm(parseAnnouncementRegexClient(text));
-        }, 500);
-      }
-    }
-
-    // 스마트 공고문 분석기 (정규식 기반)
-    function parseAnnouncementRegexClient(text) {
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      const result = { resource: '', target: '', content: '', deadline: '', org: '' };
-
-      // 1. 자원명 / 사업명
-      const resMatch = text.match(/(?:사업명|프로그램명|자원명|공고명|행사명|사업\s*명칭)\s*[:：\-\]]\s*([^\n\r]+)/i);
-      if (resMatch) {
-        result.resource = resMatch[1].trim();
-      } else {
-        const titleMatch = text.match(/^\[([^\]]+)\]/) || text.match(/<([^>]+)>/);
-        if (titleMatch) result.resource = titleMatch[1].trim();
-        else if (lines.length > 0) result.resource = lines[0].replace(/^[0-9\.\-\s]+/, '').trim();
-      }
-
-      // 2. 지원대상
-      const targetMatch = text.match(/(?:지원대상|대상자|신청자격|참여대상|모집대상|대상)\s*[:：\-\]]\s*([^\n\r]+)/i);
-      if (targetMatch) result.target = targetMatch[1].trim();
-
-      // 3. 지원내용
-      const contentMatch = text.match(/(?:지원내용|사업내용|지원항목|혜택|주요내용|내용)\s*[:：\-\]]\s*([^\n\r]+)/i);
-      if (contentMatch) result.content = contentMatch[1].trim();
-
-      // 4. 마감일
-      const deadlineMatch = text.match(/(?:마감일|신청기한|접수기간|신청기간|모집기한|접수마감|모집기간|기한)\s*[:：\-\]]\s*([^\n\r]+)/i);
-      if (deadlineMatch) {
-        const raw = deadlineMatch[1].trim();
-        const dMatch = raw.match(/(\d{4})[.\-\/년]\s*(\d{1,2})[.\-\/월]\s*(\d{1,2})/);
-        if (dMatch) result.deadline = `${dMatch[1]}-${String(dMatch[2]).padStart(2, '0')}-${String(dMatch[3]).padStart(2, '0')}`;
-        else result.deadline = raw.split('~').pop().trim();
-      } else {
-        const genDate = text.match(/(\d{4})[.\-\/년]\s*(\d{1,2})[.\-\/월]\s*(\d{1,2})[일\s]*(?:까지|마감)?/);
-        if (genDate) result.deadline = `${genDate[1]}-${String(genDate[2]).padStart(2, '0')}-${String(genDate[3]).padStart(2, '0')}`;
-      }
-
-      // 5. 모집기관
-      const orgMatch = text.match(/(?:모집기관|접수처|주관|주최|문의처|접수기관|시행기관|기관명|문의)\s*[:：\-\]]\s*([^\n\r]+)/i);
-      if (orgMatch) {
-        result.org = orgMatch[1].trim();
-      } else {
-        const orgEnd = text.match(/([가-힣A-Za-z0-9\s]+(?:자활센터|복지관|주민센터|구청|재단|센터|협회|공단|복지재단))/);
-        if (orgEnd) result.org = orgEnd[1].trim();
-      }
-
-      return result;
-    }
-
-    // 폼 제출: 새 자원 저장
-    function handleSaveResource(e) {
-      e.preventDefault();
-
-      const saveBtn = document.getElementById("btnSaveResource");
-      const record = {
-        resource: document.getElementById("inputResource").value.trim(),
-        target: document.getElementById("inputTarget").value.trim(),
-        content: document.getElementById("inputContent").value.trim(),
-        deadline: document.getElementById("inputDeadline").value.trim(),
-        org: document.getElementById("inputOrg").value.trim(),
-        status: document.getElementById("inputStatus").value
-      };
-
-      if (!record.resource || !record.target) {
-        alert("자원명과 지원대상은 필수 입력 항목입니다.");
-        return;
-      }
-
-      saveBtn.disabled = true;
-      saveBtn.textContent = "저장 중...";
-
-      // (1) 구글 앱스 스크립트 시트에 행 추가
-      if (typeof google !== "undefined" && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(res => {
-            saveBtn.disabled = false;
-            saveBtn.textContent = "💾 시트에 등록하기";
-            if (res.success) {
-              alert("구글 시트에 성공적으로 등록되었습니다!");
-              closeAddModal();
-              fetchSheetData();
-            } else {
-              alert("등록 실패: " + res.error);
-            }
-          })
-          .withFailureHandler(err => {
-            saveBtn.disabled = false;
-            saveBtn.textContent = "💾 시트에 등록하기";
-            alert("서버 오류: " + err);
-          })
-          .addResourceToSheet(record);
-      } else {
-        // (2) 로컬 테스트 시뮬레이션
-        setTimeout(() => {
-          saveBtn.disabled = false;
-          saveBtn.textContent = "💾 시트에 등록하기";
-          record.id = dataList.length + 1;
-          dataList.unshift(record);
-          render();
-          alert("새 자원이 목록에 추가되었습니다! (로컬 테스트)");
-          closeAddModal();
-        }, 400);
-      }
-    }
-
-    // 4. [화면 렌더링 함수]
-    function render() {
-      const queryLower = searchQuery.toLowerCase();
-
-      // 필터 및 검색 적용
-      const filtered = dataList.filter(item => {
-        const matchFilter = (activeFilter === "전체") || (item.status === activeFilter);
-        const masked = maskName(item.target);
-        const matchSearch = item.target.toLowerCase().includes(queryLower) || 
-                            masked.toLowerCase().includes(queryLower) || 
-                            item.resource.toLowerCase().includes(queryLower);
-        return matchFilter && matchSearch;
-      });
-
-      grid.innerHTML = "";
-
-      if (filtered.length === 0) {
-        grid.innerHTML = `<div class="empty-msg">🔎 조건에 일치하는 자원연계 내역이 없습니다.</div>`;
-        updateCounts();
-        return;
-      }
-
-      const fragment = document.createDocumentFragment();
-      filtered.forEach(item => fragment.appendChild(createCardNode(item)));
-      grid.appendChild(fragment);
-
-      updateCounts();
-    }
-
-    // 5. [상단 통계 수치 갱신]
-    function updateCounts() {
-      countTotal.textContent = `${dataList.length}건`;
-      countPending.textContent = `${dataList.filter(d => d.status === "대기").length}건`;
-      countCompleted.textContent = `${dataList.filter(d => d.status === "완료").length}건`;
-    }
-
-    // 클립보드 복사 함수
-    function copyToClipboard(text, onSuccess) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text)
-          .then(onSuccess)
-          .catch(() => fallbackCopy(text, onSuccess));
-      } else {
-        fallbackCopy(text, onSuccess);
-      }
-    }
-
-    function fallbackCopy(text, onSuccess) {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      try {
-        const successful = document.execCommand("copy");
-        if (successful && onSuccess) onSuccess();
-      } catch (err) {
-        alert("클립보드 복사에 실패했습니다.");
-      } finally {
-        document.body.removeChild(textarea);
-      }
-    }
-
-    // 이벤트 리스너: 필터 탭
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        activeFilter = btn.dataset.filter;
-        render();
-      });
-    });
-
-    // 이벤트 리스너: 검색창
-    document.getElementById("searchInput").addEventListener("input", e => {
-      searchQuery = e.target.value.trim();
-      render();
-    });
-
-    // 페이지 진입 시 암호 인증 상태 확인
-    window.addEventListener("DOMContentLoaded", checkAuthStatus);
+    // Initialize Lucide icons
+    lucide.createIcons();
   </script>
 </body>
 </html>
